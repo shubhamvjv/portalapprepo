@@ -70,6 +70,10 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          # 👇 VVV IMPORTANT FIX VVV
+          # This forces Yarn to create a real 'node_modules' folder
+          yarn config set nodeLinker node-modules
+          
           yarn config set enableImmutableInstalls false
           yarn install
 
@@ -172,5 +176,6 @@ jobs:
 
       - name: Restart Web App
         run: az webapp restart --name "$AZURE_WEBAPP_NAME" --resource-group "$AZURE_RG"
+
 
 
