@@ -22,9 +22,8 @@ provider "azurerm" {
 # RESOURCE GROUP (Terraform will manage it)
 # -------------------------------------------------------
 
-resource "azurerm_resource_group" "rg" {
-  name     = var.resource_group_name
-  location = var.location
+data "azurerm_resource_group" "rg" {
+  name = var.resource_group_name
 }
 
 # -------------------------------------------------------
@@ -38,6 +37,7 @@ resource "azurerm_storage_account" "sa" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
 }
+
 
 
 
