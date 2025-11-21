@@ -39,6 +39,23 @@ jobs:
       artifact-name: next-build
 
     steps:
+
+      - name: 🕵️ Debug Secret Presence
+        run: |
+          if [ -z "${{ secrets.AZ_CLIENT_ID }}" ]; then
+            echo "❌ ERROR: AZ_CLIENT_ID secret is MISSING or EMPTY."
+            exit 1
+          else
+            echo "✅ AZ_CLIENT_ID is present."
+          fi
+          
+          if [ -z "${{ secrets.AZURE_WEBAPP_NAME }}" ]; then
+            echo "⚠️ WARNING: AZURE_WEBAPP_NAME secret is missing. (This is OK if you provided a Manual Input)"
+          else
+            echo "✅ AZURE_WEBAPP_NAME secret is present."
+          fi
+      # 👆👆👆 END INSERT 👆👆👆
+      
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -146,3 +163,4 @@ jobs:
 
       - name: Restart Web App
         run: az webapp restart --name "$AZURE_WEBAPP_NAME" --resource-group "$AZURE_RG"
+
