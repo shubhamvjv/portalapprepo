@@ -1,0 +1,168 @@
+name: Deploy to Azure Web App
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - 'package.json'
+      - 'yarn.lock'
+      - 'next.config.js'
+      - 'public/**'
+      - 'src/**'
+
+  workflow_dispatch:
+    inputs: 
+      webapp_name:
+        description: 'The dynamically provisioned Azure Web App name.'
+        required: true
+        type: string
+
+env:
+  AZURE_RG: 
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: next-build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: "yarn"
+
+      - name: Enable Corepack + Yarn Berry
+        run: |
+          corepack enable
+          corepack prepare yarn@stable --activate
+
+      - name: Install Dependencies (No Immutable Mode)
+        run: |
+          yarn config set enableImmutableInstalls false
+          yarn install
+
+      - name: Build Next.js
+        env:
+          NODE_OPTIONS: --no-node-snapshot
+        run: yarn build
+
+      - name: Archive for Deploy (Standalone Mode)
+        run: |
+          cp -r public ./.next/standalone
+          tar -czf app.tar.gz -C ./.next/standalone .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: app.tar.gz
+
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    env:
+      AZURE_WEBAPP_NAME: 
+      AZ_CLIENT_ID: 
+      AZ_CLIENT_SECRET: 
+      AZ_SUBSCRIPTION_ID: 
+      AZ_TENANT_ID: 
+      AZURE_REGION: 
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      # Download artifact from build job
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: next-build
+
+      - name: Unpack Artifact
+        run: tar -xzf app.tar.gz
+
+      # -------------------------------
+      # 🔐 AZURE LOGIN
+      # -------------------------------
+      - name: Azure CLI Login
+        run: |
+          az login --service-principal \
+            --username "$AZ_CLIENT_ID" \
+            --password "$AZ_CLIENT_SECRET" \
+            --tenant "$AZ_TENANT_ID"
+          az account set --subscription "$AZ_SUBSCRIPTION_ID"
+
+      # -------------------------------
+      # 🟦 TERRAFORM SECTION (ADDED)
+      # -------------------------------
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Create terraform.tfvars
+        run: |
+          mkdir -p terraform
+          cat <<EOF > terraform/terraform.tfvars
+          subscription_id     = ""
+          tenant_id           = ""
+          client_id           = ""
+          client_secret       = ""
+          resource_group_name = ""
+          location            = ""
+          app_service_name    = ""
+          EOF
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: terraform plan
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -auto-approve
+
+      # -------------------------------
+      # 🌐 CREATE APP SERVICE PLAN
+      # -------------------------------
+      - name: Create App Service Plan (F1 Free)
+        run: |
+          az appservice plan create \
+            --name "${AZURE_WEBAPP_NAME}-plan" \
+            --resource-group "$AZURE_RG" \
+            --sku F1 \
+            --is-linux
+
+      # -------------------------------
+      # 🌐 CREATE WEB APP
+      # -------------------------------
+      - name: Create Web App
+        run: |
+          az webapp create \
+            --name "$AZURE_WEBAPP_NAME" \
+            --resource-group "$AZURE_RG" \
+            --plan "${AZURE_WEBAPP_NAME}-plan" \
+            --runtime "NODE:20-lts" \
+            --deployment-local-git
+
+      # -------------------------------
+      # 🚀 DEPLOY NEXT.JS ARTIFACT
+      # -------------------------------
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 
+          package: .
+          slot-name: production
+
+      - name: Restart Web App
+        run: az webapp restart --name "$AZURE_WEBAPP_NAME" --resource-group "$AZURE_RG"

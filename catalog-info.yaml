@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: "portalapp"
+  description: "portalapp"
+  annotations:
+    github.com/project-slug: "undefined/undefined"
+spec:
+  type: website
+  owner: "shubhamvjv"
+  lifecycle: experimental
