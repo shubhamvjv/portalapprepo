@@ -76,9 +76,11 @@ resource "azurerm_linux_web_app" "app" {
       node_version = "20-lts"
     }
     always_on = false # Must be false for F1 (Free) tier
+app_command_line = "node server.js"
   }
 
   app_settings = {
     "WEBSITE_RUN_FROM_PACKAGE" = "1"
   }
 }
+
