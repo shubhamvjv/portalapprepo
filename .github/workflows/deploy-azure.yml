@@ -80,7 +80,16 @@ jobs:
 
       - name: Archive for Deploy
         run: |
-          cp -r public ./.next/standalone
+          # 1. Copy public assets
+          cp -r public ./.next/standalone/public
+          
+          # 2. Create the static folder structure
+          mkdir -p ./.next/standalone/.next/static
+          
+          # 3. Copy the actual static files (CSS/JS chunks)
+          cp -r .next/static/* ./.next/standalone/.next/static/
+          
+          # 4. Zip the standalone folder
           tar -czf app.tar.gz -C ./.next/standalone .
 
       - name: Upload Artifact
@@ -163,4 +172,5 @@ jobs:
 
       - name: Restart Web App
         run: az webapp restart --name "$AZURE_WEBAPP_NAME" --resource-group "$AZURE_RG"
+
 
